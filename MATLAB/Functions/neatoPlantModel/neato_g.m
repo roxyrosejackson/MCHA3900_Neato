@@ -1,0 +1,54 @@
+function [g,Gt] = neato_g(u,eta3,dt)
+    
+    global param;
+    parameters;
+    
+    % u(1)  : left motor velocity
+    % u(2)  : right motor velocity
+    %
+    % mu(1)  : N posistion
+    % mu(2)  : E position
+    % mu(3)  : psi angle
+    
+   
+    vCBc        = [mean(u(1:2)), 0, 0]';
+    omegaCBc    = [0, 0, (u(2) - u(1))/(2*param.wb)]';
+    
+    nuc = [vCBc;omegaCBc];
+    
+    % N, E, psi
+    nub3  = param.Rbc*nuc(param.IdxofI);  % u, v, r
+
+    % Pad eta with zeros
+    eta = zeros(6,1);           % N, E, D, phi, theta, psi
+    eta(param.IdxofI) = eta3;            
+    
+    % Obtain kinematic transformation for DOF of interest
+    J = eulerKinematicTransformation(eta);
+    J3 = J(param.IdxofI,param.IdxofI);
+    
+    dynamicsShapeMatrix = [ zeros(param.n_states),        J3;
+                            zeros(param.n_states),zeros(param.n_states);];
+    dynamicsVec         = dynamicsShapeMatrix*[eta3;nub3;];                 
+    
+    deta3 = dynamicsVec(1:3);
+    dnub3 = dynamicsVec(4:6);
+    
+    % integration of states
+    eta3 = eta3 + deta3*dt;
+    
+    % Kinematic model
+    % Non-linear model
+    g = eta3;
+    
+    % linearised model Jacobian
+    psiSpace = [ -nub3(1)*sin(eta3(3))*dt;   % N
+                 nub3(1)*cos(eta3(3))*dt;    % E
+                 0;];                      % psi
+    % linearised model
+    Gxt = eye(param.n_states) + [zeros(param.n_states, 2),psiSpace];
+    
+    %Gt  = [ Gxt,                      zeros(param.n_states);
+    %        zeros(param.n_states),    eye(param.n_states);];
+    Gt = Gxt;%[zeros(param.n_states, 2),psiSpace];
+end
